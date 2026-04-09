@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -11,19 +11,32 @@ from app.services.weather_service import fetch_forecast, fetch_weather
 
 router = APIRouter(prefix="/api", tags=["weather"])
 
+# Singapore Time (UTC+8) — used for display formatting
+SGT = timezone(timedelta(hours=8))
+
+
+def _fmt_sgt(dt: datetime) -> str:
+    """Convert any datetime (naive = UTC assumed) to a formatted SGT string."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(SGT).strftime("%Y-%m-%d %I:%M %p")
+
 
 @router.get("/weather")
 async def get_weather(
     city: str = Query(..., min_length=1, description="City name"),
     country: str = Query("", description="ISO 3166-1 alpha-2 country code (e.g. MY)"),
+    save: bool = Query(True, description="Whether to save this search to history"),
+    travel_from: str = Query("", description="Optional travel start date (YYYY-MM-DD)"),
+    travel_to: str = Query("", description="Optional travel end date (YYYY-MM-DD)"),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
     Fetch current weather for a city/country pair.
 
-    Saves the search to history on success.
-    Returns 404 if the city/country combination is not recognised by OpenWeatherMap.
-    Returns 502 if the OpenWeatherMap API key is invalid or not yet activated.
+    Pass save=false to skip saving to history (e.g. popular-city card clicks).
+    Returns 404 if the city/country combination is not recognised.
+    Returns 502 if the API key is invalid or not yet activated.
     """
     try:
         weather_data = await fetch_weather(city.strip(), country.strip())
@@ -33,18 +46,24 @@ async def get_weather(
     if weather_data is None:
         raise HTTPException(status_code=404, detail="City not found")
 
-    # Build and persist the search record
-    doc = SearchHistoryDocument(
-        city=weather_data["city"],
-        country=weather_data["country"],
-        searched_at=datetime.utcnow(),
-    )
-    result = await db.search_history.insert_one(doc.model_dump())
+    now_utc = datetime.now(timezone.utc)
+    history_id = ""
+
+    if save:
+        doc = SearchHistoryDocument(
+            city=weather_data["city"],
+            country=weather_data["country"],
+            searched_at=now_utc,
+            travel_from=travel_from.strip() or None,
+            travel_to=travel_to.strip() or None,
+        )
+        result = await db.search_history.insert_one(doc.model_dump())
+        history_id = str(result.inserted_id)
 
     return {
         **weather_data,
-        "history_id": str(result.inserted_id),
-        "searched_at": doc.searched_at.strftime("%I:%M:%S %p"),
+        "history_id": history_id,
+        "searched_at": _fmt_sgt(now_utc),
     }
 
 
@@ -59,7 +78,9 @@ async def get_history(db: AsyncIOMotorDatabase = Depends(get_db)):
             "id": str(r["_id"]),
             "city": r["city"],
             "country": r["country"],
-            "searched_at": r["searched_at"].strftime("%I:%M:%S %p"),
+            "searched_at": _fmt_sgt(r["searched_at"]),
+            "travel_from": r.get("travel_from"),
+            "travel_to": r.get("travel_to"),
         }
         for r in records
     ]

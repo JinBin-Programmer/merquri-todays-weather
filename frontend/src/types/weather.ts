@@ -24,12 +24,12 @@ export interface WeatherData {
   visibility_km: number;
   wind_speed: number;   // m/s
   cloudiness: number;   // Percentage (0–100)
-  sunrise: string;      // UTC time, e.g. "06:31 AM"
-  sunset: string;       // UTC time, e.g. "06:45 PM"
-  time: string;         // Formatted UTC datetime, e.g. "2021-03-16 03:15 PM"
+  sunrise: string;      // SGT time, e.g. "06:31 AM"
+  sunset: string;       // SGT time, e.g. "06:45 PM"
+  time: string;         // SGT datetime, e.g. "2024-03-16 03:15 PM"
   forecast: ForecastDay[];
-  history_id: string;   // MongoDB ObjectId as a hex string
-  searched_at: string;  // Formatted time, e.g. "03:15:02 PM"
+  history_id: string;   // MongoDB ObjectId as a hex string (empty when save=false)
+  searched_at: string;  // SGT datetime string
 }
 
 /** A single entry from the search history list */
@@ -37,7 +37,9 @@ export interface HistoryRecord {
   id: string;           // MongoDB ObjectId as a hex string
   city: string;
   country: string;
-  searched_at: string;  // Formatted time, e.g. "03:15:02 PM"
+  searched_at: string;  // SGT datetime string
+  travel_from?: string; // ISO date string, e.g. "2024-05-10" (optional)
+  travel_to?: string;   // ISO date string, e.g. "2024-05-15" (optional)
 }
 
 /** Possible UI states for a weather search */

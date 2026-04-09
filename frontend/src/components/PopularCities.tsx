@@ -1,5 +1,7 @@
 "use client";
 
+import { COUNTRY_NAME } from "@/data/locations";
+
 interface City {
   city: string;
   country: string;
@@ -95,13 +97,14 @@ export default function PopularCities({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {POPULAR_CITIES.map((city) => {
           const isLoading = loadingCity === `${city.city}-${city.country}`;
+          const countryName = COUNTRY_NAME[city.country] ?? city.country;
 
           return (
             <button
               key={`${city.city}-${city.country}`}
               onClick={() => handleClick(city)}
               disabled={loadingCity !== null}
-              aria-label={`Search weather for ${city.city}, ${city.country}`}
+              aria-label={`Search weather for ${city.city}, ${countryName}`}
               className="relative overflow-hidden rounded-xl h-28 sm:h-32 group
                          focus:outline-none focus:ring-2 focus:ring-blue-400
                          disabled:cursor-wait transition-transform duration-200
@@ -133,7 +136,8 @@ export default function PopularCities({
                     {city.city}
                   </span>
                 </div>
-                <p className="text-gray-300 text-xs mt-0.5 leading-tight">{city.landmark}</p>
+                {/* Full country name instead of 2-letter code */}
+                <p className="text-gray-300 text-xs mt-0.5 leading-tight">{countryName}</p>
               </div>
             </button>
           );

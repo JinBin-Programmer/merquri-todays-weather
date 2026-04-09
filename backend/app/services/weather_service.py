@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import httpx
 from dotenv import load_dotenv
@@ -10,43 +10,38 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 OPENWEATHER_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 
+# Singapore / Malaysia time (UTC+8)
+SGT = timezone(timedelta(hours=8))
+
 
 async def fetch_weather(city: str, country: str) -> dict | None:
     """
     Fetch current weather from OpenWeatherMap API.
 
-    Args:
-        city: City name, e.g. "Johor Bahru"
-        country: ISO 3166-1 alpha-2 country code, e.g. "MY"
-
-    Returns:
-        Processed weather dict on success, or None if the city/country was not found.
-
-    Raises:
-        httpx.HTTPStatusError: For unexpected non-404 API errors.
+    Returns processed weather dict on success, or None if city/country not found.
+    Raises ValueError for invalid API key.
+    All times are expressed in UTC+8 (Singapore Time).
     """
     params = {
         "q": f"{city},{country}" if country else city,
         "appid": OPENWEATHER_API_KEY,
-        "units": "metric",  # Return temperatures in Celsius
+        "units": "metric",
     }
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(OPENWEATHER_BASE_URL, params=params)
 
-    # OpenWeatherMap returns 404 for unknown city/country combinations
     if response.status_code == 404:
         return None
 
-    # 401 means the API key is invalid or not yet activated (new keys can take up to 2 hours)
     if response.status_code == 401:
         raise ValueError("Invalid or inactive OpenWeatherMap API key")
 
     response.raise_for_status()
     data = response.json()
 
-    # Convert Unix UTC timestamp to a readable datetime string
-    dt = datetime.fromtimestamp(data["dt"], tz=timezone.utc)
+    # Convert Unix timestamp → SGT
+    dt = datetime.fromtimestamp(data["dt"], tz=SGT)
     formatted_time = dt.strftime("%Y-%m-%d %I:%M %p")
 
     return {
@@ -64,17 +59,17 @@ async def fetch_weather(city: str, country: str) -> dict | None:
         "wind_speed": round(data.get("wind", {}).get("speed", 0), 2),
         "cloudiness": data.get("clouds", {}).get("all", 0),
         "sunrise": datetime.fromtimestamp(
-            data["sys"]["sunrise"], tz=timezone.utc
+            data["sys"]["sunrise"], tz=SGT
         ).strftime("%I:%M %p"),
         "sunset": datetime.fromtimestamp(
-            data["sys"]["sunset"], tz=timezone.utc
+            data["sys"]["sunset"], tz=SGT
         ).strftime("%I:%M %p"),
         "time": formatted_time,
     }
 
 
 async def fetch_forecast(city: str, country: str) -> dict | None:
-    """Fetch 5-day weather forecast (3-hour intervals) and return one noon point per day."""
+    """Fetch 5-day weather forecast and return one noon-ish point per day (in SGT)."""
     params = {
         "q": f"{city},{country}" if country else city,
         "appid": OPENWEATHER_API_KEY,
@@ -97,10 +92,11 @@ async def fetch_forecast(city: str, country: str) -> dict | None:
     daily_forecast = []
 
     for entry in data.get("list", []):
-        timestamp = datetime.fromtimestamp(entry["dt"], tz=timezone.utc)
+        # Convert to SGT so date grouping and hour filtering are local-time–aware
+        timestamp = datetime.fromtimestamp(entry["dt"], tz=SGT)
         date_key = timestamp.strftime("%Y-%m-%d")
 
-        # Prefer noon-ish data point so each day is easier to read.
+        # Prefer the noon-ish SGT data point (12:00 or 15:00 SGT)
         if timestamp.hour not in {12, 15}:
             continue
 

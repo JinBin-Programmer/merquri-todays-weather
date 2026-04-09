@@ -8,7 +8,9 @@ export function useWeather() {
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [city, setCity] = useState("");
-  const [country, setCountry] = useState("");
+  const [country, setCountry] = useState("");         // ISO code, e.g. "MY"
+  const [travelFrom, setTravelFrom] = useState("");   // ISO date, e.g. "2024-05-10"
+  const [travelTo, setTravelTo] = useState("");       // ISO date, e.g. "2024-05-15"
   // Tracks which popular city card is currently loading (format: "City-COUNTRY")
   const [loadingCity, setLoadingCity] = useState<string | null>(null);
 
@@ -29,9 +31,19 @@ export function useWeather() {
     fetchHistory();
   }, [fetchHistory]);
 
-  /** Search weather for the given city and country */
+  /**
+   * Search weather for the given city and country.
+   *
+   * @param fromCard   true when triggered by a popular-city card (shows card spinner)
+   * @param saveToHistory  true only when the user explicitly clicked the Search button
+   */
   const search = useCallback(
-    async (searchCity: string, searchCountry: string, fromCard = false) => {
+    async (
+      searchCity: string,
+      searchCountry: string,
+      fromCard = false,
+      saveToHistory = false
+    ) => {
       if (!searchCity.trim()) return;
 
       setStatus("loading");
@@ -41,6 +53,9 @@ export function useWeather() {
         const params = new URLSearchParams({
           city: searchCity.trim(),
           country: searchCountry.trim(),
+          save: saveToHistory ? "true" : "false",
+          ...(saveToHistory && travelFrom ? { travel_from: travelFrom } : {}),
+          ...(saveToHistory && travelTo ? { travel_to: travelTo } : {}),
         });
 
         const [weatherRes, forecastRes] = await Promise.all([
@@ -75,34 +90,38 @@ export function useWeather() {
         setWeather(data);
         setStatus("success");
 
-        // Refresh history so the new record appears immediately
-        await fetchHistory();
+        // Only refresh history when a record was actually saved
+        if (saveToHistory) {
+          await fetchHistory();
+        }
       } catch {
         setStatus("error");
       } finally {
         setLoadingCity(null);
       }
     },
-    [fetchHistory]
+    [fetchHistory, travelFrom, travelTo]
   );
 
   /** Remove a single record from history (optimistic update) */
-  const deleteHistory = useCallback(async (id: string) => {
-    // Optimistically remove from UI first for snappy feedback
-    setHistory((prev) => prev.filter((r) => r.id !== id));
-
-    try {
-      await fetch(`/api/history/${id}`, { method: "DELETE" });
-    } catch {
-      // If deletion fails, re-fetch to restore accurate state
-      fetchHistory();
-    }
-  }, [fetchHistory]);
+  const deleteHistory = useCallback(
+    async (id: string) => {
+      setHistory((prev) => prev.filter((r) => r.id !== id));
+      try {
+        await fetch(`/api/history/${id}`, { method: "DELETE" });
+      } catch {
+        fetchHistory();
+      }
+    },
+    [fetchHistory]
+  );
 
   /** Clear search inputs and reset the weather display area */
   const clear = useCallback(() => {
     setCity("");
     setCountry("");
+    setTravelFrom("");
+    setTravelTo("");
     setWeather(null);
     setStatus("idle");
   }, []);
@@ -116,6 +135,10 @@ export function useWeather() {
     setCity,
     country,
     setCountry,
+    travelFrom,
+    setTravelFrom,
+    travelTo,
+    setTravelTo,
     search,
     deleteHistory,
     clear,
