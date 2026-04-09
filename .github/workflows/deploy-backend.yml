@@ -1,12 +1,9 @@
 name: Deploy Backend to Cloud Run
 
-# Triggers on every push to main that touches the backend or this workflow file
 on:
   push:
     branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:   # Allows manual trigger from the GitHub Actions UI
 
 env:
   REGION: asia-southeast1                          # Change if you prefer a different region
