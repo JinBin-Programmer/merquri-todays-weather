@@ -9,6 +9,8 @@ export function useWeather() {
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
+  // Tracks which popular city card is currently loading (format: "City-COUNTRY")
+  const [loadingCity, setLoadingCity] = useState<string | null>(null);
 
   /** Reload the search history list from the backend */
   const fetchHistory = useCallback(async () => {
@@ -29,10 +31,11 @@ export function useWeather() {
 
   /** Search weather for the given city and country */
   const search = useCallback(
-    async (searchCity: string, searchCountry: string) => {
+    async (searchCity: string, searchCountry: string, fromCard = false) => {
       if (!searchCity.trim()) return;
 
       setStatus("loading");
+      if (fromCard) setLoadingCity(`${searchCity}-${searchCountry}`);
 
       try {
         const params = new URLSearchParams({
@@ -64,6 +67,8 @@ export function useWeather() {
         await fetchHistory();
       } catch {
         setStatus("error");
+      } finally {
+        setLoadingCity(null);
       }
     },
     [fetchHistory]
@@ -94,6 +99,7 @@ export function useWeather() {
     weather,
     history,
     status,
+    loadingCity,
     city,
     setCity,
     country,
