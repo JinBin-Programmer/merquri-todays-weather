@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.database import get_db
 from app.models.search_history import SearchHistoryDocument
-from app.services.weather_service import fetch_weather
+from app.services.weather_service import fetch_forecast, fetch_weather
 
 router = APIRouter(prefix="/api", tags=["weather"])
 
@@ -77,3 +77,20 @@ async def delete_history(history_id: str, db: AsyncIOMotorDatabase = Depends(get
 
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Record not found")
+
+
+@router.get("/forecast")
+async def get_forecast(
+    city: str = Query(..., min_length=1, description="City name"),
+    country: str = Query("", description="ISO 3166-1 alpha-2 country code (e.g. MY)"),
+):
+    """Fetch a concise 5-day forecast for a city/country pair."""
+    try:
+        forecast_data = await fetch_forecast(city.strip(), country.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    if forecast_data is None:
+        raise HTTPException(status_code=404, detail="City not found")
+
+    return forecast_data

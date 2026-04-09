@@ -43,23 +43,35 @@ export function useWeather() {
           country: searchCountry.trim(),
         });
 
-        const res = await fetch(`/api/weather?${params.toString()}`);
+        const [weatherRes, forecastRes] = await Promise.all([
+          fetch(`/api/weather?${params.toString()}`),
+          fetch(`/api/forecast?${params.toString()}`),
+        ]);
 
-        if (res.status === 404) {
+        if (weatherRes.status === 404 || forecastRes.status === 404) {
           setWeather(null);
           setStatus("not_found");
           return;
         }
 
-        if (res.status === 502) {
+        if (weatherRes.status === 502 || forecastRes.status === 502) {
           setWeather(null);
           setStatus("api_key_error");
           return;
         }
 
-        if (!res.ok) throw new Error(`Unexpected API status: ${res.status}`);
+        if (!weatherRes.ok || !forecastRes.ok) {
+          throw new Error(`Unexpected API status: ${weatherRes.status}/${forecastRes.status}`);
+        }
 
-        const data: WeatherData = await res.json();
+        const weatherData = await weatherRes.json();
+        const forecastData = await forecastRes.json();
+
+        const data: WeatherData = {
+          ...weatherData,
+          forecast: forecastData.forecast ?? [],
+        };
+
         setWeather(data);
         setStatus("success");
 
