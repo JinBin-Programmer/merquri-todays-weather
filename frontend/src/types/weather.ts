@@ -1,3 +1,15 @@
+/** A single 3-hour slot in today's hourly forecast */
+export interface HourlySlot {
+  time: string;       // e.g. "02:00 PM"
+  condition: string;
+  description: string;
+  temp: number;
+  feels_like: number;
+  humidity: number;
+  wind_speed: number;
+  pop: number;        // precipitation probability 0–100 %
+}
+
 /** A single day in the forecast/history view */
 export interface ForecastDay {
   date: string;       // display string, e.g. "Mon, Apr 10"
@@ -29,7 +41,10 @@ export interface WeatherData {
   sunrise: string;      // SGT time, e.g. "06:31 AM"
   sunset: string;       // SGT time, e.g. "06:45 PM"
   time: string;         // SGT datetime, e.g. "2024-03-16 03:15 PM"
+  aqi?: number;         // Air Quality Index 1–5
+  aqi_label?: string;   // "Good" | "Fair" | "Moderate" | "Poor" | "Very Poor"
   forecast: ForecastDay[];
+  hourly: HourlySlot[]; // Today's 3-hour forecast slots
   history_id: string;   // MongoDB ObjectId as a hex string (empty when save=false)
   searched_at: string;  // SGT datetime string
 }

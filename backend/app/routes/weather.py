@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.database import get_db
 from app.models.search_history import SearchHistoryDocument
 from app.services.weather_service import (
+    fetch_aqi,
     fetch_coords,
     fetch_extended_forecast,
     fetch_forecast,
@@ -48,6 +49,9 @@ async def get_weather(
     if weather_data is None:
         raise HTTPException(status_code=404, detail="City not found")
 
+    # Fetch AQI in parallel with history save (non-blocking, silently ignored on failure)
+    aqi_data = await fetch_aqi(weather_data["lat"], weather_data["lon"])
+
     now_utc = datetime.now(timezone.utc)
     history_id = ""
 
@@ -64,6 +68,7 @@ async def get_weather(
 
     return {
         **weather_data,
+        **(aqi_data or {}),
         "history_id": history_id,
         "searched_at": _fmt_sgt(now_utc),
     }

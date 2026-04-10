@@ -226,10 +226,17 @@ export default function PopularCities({
               {/* City info */}
               <div className="absolute bottom-0 left-0 right-0 p-2.5 text-left">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base leading-none text-white">{city.flag}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`https://flagcdn.com/w20/${city.country.toLowerCase()}.png`}
+                    width={16} height={12}
+                    alt={countryName}
+                    className="rounded-[2px] shrink-0 shadow-sm"
+                  />
                   <span className="text-white font-semibold text-sm leading-tight drop-shadow truncate">
                     {city.city}
                   </span>
+                  <span className="text-white/70 text-xs font-mono shrink-0">{city.country}</span>
                 </div>
                 <p className="text-gray-300 text-xs mt-0.5 leading-tight truncate">{countryName}</p>
               </div>

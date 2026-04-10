@@ -1,6 +1,7 @@
 import asyncio
 import os
 from datetime import date as date_cls, datetime, timezone, timedelta
+from time import monotonic
 
 import httpx
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 OPENWEATHER_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 OPENWEATHER_GEO_URL = "https://api.openweathermap.org/geo/1.0/direct"
+OPENWEATHER_AQI_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
 
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
@@ -21,6 +23,31 @@ OPEN_METEO_DAILY = (
 
 # Singapore / Malaysia time (UTC+8)
 SGT = timezone(timedelta(hours=8))
+
+# AQI level labels (OWM uses 1-5 scale)
+AQI_LABELS = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}
+
+
+# ── In-memory TTL cache (10-minute TTL, no external dependencies) ─────────────
+
+class _TTLCache:
+    def __init__(self, ttl: int = 600):
+        self._store: dict[str, tuple[float, object]] = {}
+        self._ttl = ttl
+
+    def get(self, key: str):
+        if key in self._store:
+            ts, val = self._store[key]
+            if monotonic() - ts < self._ttl:
+                return val
+            del self._store[key]
+        return None
+
+    def set(self, key: str, val: object) -> None:
+        self._store[key] = (monotonic(), val)
+
+
+_cache = _TTLCache(ttl=600)  # 10-minute TTL
 
 # WMO weather code → (condition, description) — matches OWM condition strings
 WMO_CONDITION: dict[int, tuple[str, str]] = {
@@ -58,7 +85,12 @@ async def fetch_weather(city: str, country: str) -> dict | None:
     Returns processed weather dict on success, or None if city/country not found.
     Raises ValueError for invalid API key.
     All times are expressed in UTC+8 (Singapore Time).
+    Responses are cached for 10 minutes.
     """
+    cache_key = f"weather:{city.lower()}:{country.lower()}"
+    if cached := _cache.get(cache_key):
+        return cached  # type: ignore[return-value]
+
     params = {
         "q": f"{city},{country}" if country else city,
         "appid": OPENWEATHER_API_KEY,
@@ -80,7 +112,7 @@ async def fetch_weather(city: str, country: str) -> dict | None:
     dt = datetime.fromtimestamp(data["dt"], tz=SGT)
     formatted_time = dt.strftime("%Y-%m-%d %I:%M %p")
 
-    return {
+    result = {
         "city": data["name"],
         "country": data["sys"]["country"],
         "condition": data["weather"][0]["main"],
@@ -104,10 +136,51 @@ async def fetch_weather(city: str, country: str) -> dict | None:
         "lat": data["coord"]["lat"],
         "lon": data["coord"]["lon"],
     }
+    _cache.set(cache_key, result)
+    return result
+
+
+async def fetch_aqi(lat: float, lon: float) -> dict | None:
+    """
+    Fetch Air Quality Index from OWM Air Pollution API.
+    Returns aqi (1–5) and aqi_label (Good/Fair/Moderate/Poor/Very Poor).
+    Cached for 10 minutes.
+    """
+    cache_key = f"aqi:{lat:.2f}:{lon:.2f}"
+    if cached := _cache.get(cache_key):
+        return cached  # type: ignore[return-value]
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            OPENWEATHER_AQI_URL,
+            params={"lat": lat, "lon": lon, "appid": OPENWEATHER_API_KEY},
+        )
+
+    if resp.status_code != 200:
+        return None
+
+    try:
+        aqi = resp.json()["list"][0]["main"]["aqi"]
+    except (KeyError, IndexError):
+        return None
+
+    result = {"aqi": aqi, "aqi_label": AQI_LABELS.get(aqi, "Unknown")}
+    _cache.set(cache_key, result)
+    return result
 
 
 async def fetch_forecast(city: str, country: str) -> dict | None:
-    """Fetch 5-day weather forecast and return one noon-ish point per day (in SGT)."""
+    """
+    Fetch 5-day OWM forecast.
+    Returns:
+    - daily: one noon-ish data point per day (up to 5 days)
+    - hourly: all 3-hour slots for today in SGT
+    Responses are cached for 10 minutes.
+    """
+    cache_key = f"forecast:{city.lower()}:{country.lower()}"
+    if cached := _cache.get(cache_key):
+        return cached  # type: ignore[return-value]
+
     params = {
         "q": f"{city},{country}" if country else city,
         "appid": OPENWEATHER_API_KEY,
@@ -126,12 +199,27 @@ async def fetch_forecast(city: str, country: str) -> dict | None:
     response.raise_for_status()
     data = response.json()
 
+    today_sgt = datetime.now(SGT).strftime("%Y-%m-%d")
     seen_dates: set[str] = set()
     daily_forecast = []
+    hourly_today = []
 
     for entry in data.get("list", []):
         timestamp = datetime.fromtimestamp(entry["dt"], tz=SGT)
         date_key = timestamp.strftime("%Y-%m-%d")
+
+        # Collect all 3-hour slots for today (SGT) as hourly data
+        if date_key == today_sgt:
+            hourly_today.append({
+                "time": timestamp.strftime("%I:%M %p"),
+                "condition": entry["weather"][0]["main"],
+                "description": entry["weather"][0]["description"],
+                "temp": round(entry["main"]["temp"], 1),
+                "feels_like": round(entry["main"]["feels_like"], 1),
+                "humidity": entry["main"]["humidity"],
+                "wind_speed": round(entry.get("wind", {}).get("speed", 0), 1),
+                "pop": round(entry.get("pop", 0) * 100),  # precipitation probability %
+            })
 
         # OWM 3-hour UTC slots → SGT: prefer 11:00 or 14:00 SGT (local noon-ish)
         if timestamp.hour not in {11, 14}:
@@ -157,11 +245,14 @@ async def fetch_forecast(city: str, country: str) -> dict | None:
         if len(daily_forecast) == 5:
             break
 
-    return {
+    result = {
         "city": data["city"]["name"],
         "country": data["city"]["country"],
         "forecast": daily_forecast,
+        "hourly": hourly_today,
     }
+    _cache.set(cache_key, result)
+    return result
 
 
 # ── Open-Meteo (extended / historical) ────────────────────────────────────────

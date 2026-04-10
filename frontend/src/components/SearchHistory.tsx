@@ -176,9 +176,17 @@ function HistoryRow({
           {index + 1}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-800 truncate">
+          <p className="text-sm font-medium text-gray-800 truncate flex items-center gap-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://flagcdn.com/w20/${record.country.toLowerCase()}.png`}
+              width={14} height={11}
+              alt={record.country}
+              className="rounded-[2px] shrink-0"
+            />
             {record.city},&nbsp;
             <span className="text-gray-500">{countryName}</span>
+            <span className="text-gray-400 font-mono text-xs shrink-0">{record.country}</span>
           </p>
           <p className="text-xs text-gray-400">{record.searched_at}</p>
 

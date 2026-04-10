@@ -1,8 +1,10 @@
 # Today's Weather
 
-A full-stack weather application built with **Next.js** (frontend) and **Python FastAPI** (backend), powered by the [OpenWeatherMap API](https://openweathermap.org/api).
+A full-stack weather application built with **Next.js** (frontend) and **Python FastAPI** (backend), powered by the [OpenWeatherMap API](https://openweathermap.org/api) and [Open-Meteo](https://open-meteo.com/).
 
-Search current weather by city and country, view persistent search history, and re-search or delete past records.
+**Live demo: [https://www.weather-jinbin.site/](https://www.weather-jinbin.site/)** — no installation required.
+
+Search current weather by city and country, explore historical and extended forecasts up to 16 days ahead, view air quality, hourly conditions, and persistent search history.
 
 ---
 
@@ -13,7 +15,7 @@ Search current weather by city and country, view persistent search history, and 
 | Frontend | Next.js 15 (App Router, TypeScript, Tailwind CSS) |
 | Backend | Python FastAPI (async) |
 | Database | MongoDB Atlas |
-| External API | OpenWeatherMap Current Weather API |
+| External APIs | OpenWeatherMap (weather, AQI, geocoding) · Open-Meteo (historical + extended forecast) |
 | Containerisation | Docker + docker-compose |
 | Backend Hosting | Google Cloud Run |
 | CI/CD | GitHub Actions |
@@ -23,11 +25,18 @@ Search current weather by city and country, view persistent search history, and 
 ## Features
 
 - Search weather by city and optional ISO country code (e.g. `MY`, `JP`)
-- Displays weather condition, temperature range, humidity, and timestamp
+- **Current conditions** — temperature, feels-like, humidity, wind speed, cloud cover, visibility, pressure
+- **Air Quality Index (AQI)** — Good / Fair / Moderate / Poor / Very Poor via OWM Air Pollution API
+- **Today's hourly forecast** — 3-hour slots showing condition, temperature, and precipitation probability
+- **5-day forecast** — daily cards with condition icon, min/max temp, humidity, wind
+- **Historical + extended forecast** — when travel dates are set, fetches past data from Open-Meteo archive (any date back to 1940) and future data up to 16 days ahead; days are labelled Historical or Forecast
+- **Travel date filter** — filter the forecast to any custom date range; shows a banner if dates exceed the 16-day forecast window
+- **Popular cities carousel** — 16 world cities for one-click weather lookup
+- **Country flags** — image-based flags (flagcdn.com) throughout the UI for cross-platform compatibility
 - Persistent search history stored in MongoDB Atlas
-- Re-search from history with one click
-- Delete individual history records
+- Re-search or delete past records from history
 - Graceful error states for invalid city/country and inactive API keys
+- Backend in-memory TTL cache (10 min) — reduces external API calls
 - Fully containerised for local development with docker-compose
 - Backend auto-deploys to Cloud Run on every push to `main`
 
@@ -142,9 +151,12 @@ The Next.js dev server proxies `/api/*` to `http://localhost:8000` by default.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/weather?city=Johor&country=MY` | Fetch weather and save to history |
-| `GET` | `/api/history` | List all search history (newest first) |
-| `DELETE` | `/api/history/{id}` | Remove a history record by MongoDB ID |
+| `GET` | `/api/weather?city=Johor&country=MY` | Current weather + AQI; saves to history by default (`save=true`) |
+| `GET` | `/api/weather?city=Johor&country=MY&save=false` | Current weather without saving to history |
+| `GET` | `/api/forecast?city=Johor&country=MY` | OWM 5-day forecast + today's hourly slots |
+| `GET` | `/api/forecast?city=Johor&country=MY&travel_from=2024-04-01&travel_to=2024-04-20` | Extended historical + forecast via Open-Meteo; returns `capped: true` when end date exceeds 16 days ahead |
+| `GET` | `/api/history` | All search history records, newest first |
+| `DELETE` | `/api/history/{id}` | Remove a single history record by MongoDB ID |
 | `GET` | `/health` | Liveness check (used by Docker & Cloud Run) |
 
 Full interactive docs available at `/docs` (Swagger UI) when the backend is running.

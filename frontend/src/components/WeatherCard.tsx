@@ -1,4 +1,7 @@
-import type { ForecastDay, WeatherData } from "@/types/weather";
+"use client";
+
+import { useRef } from "react";
+import type { ForecastDay, HourlySlot, WeatherData } from "@/types/weather";
 import WeatherAnimation from "@/components/WeatherAnimation";
 
 interface WeatherCardProps {
@@ -9,6 +12,11 @@ interface WeatherCardProps {
 }
 
 export default function WeatherCard({ weather, travelFrom, travelTo, forecastCapped }: WeatherCardProps) {
+  const scrollRef = useRef<HTMLUListElement>(null);
+  const scroll = (dir: "left" | "right") => {
+    scrollRef.current?.scrollBy({ left: dir === "right" ? 400 : -400, behavior: "smooth" });
+  };
+
   const style = getConditionStyle(weather.condition);
   const hasTravelDates = !!(travelFrom || travelTo);
 
@@ -34,7 +42,14 @@ export default function WeatherCard({ weather, travelFrom, travelTo, forecastCap
       <div className={`rounded-2xl bg-gradient-to-br ${style.gradient} p-5 shadow-lg`}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <p className={`text-sm font-semibold ${style.label} mb-0.5`}>
+            <p className={`text-sm font-semibold ${style.label} mb-0.5 flex items-center gap-1.5`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://flagcdn.com/w20/${weather.country.toLowerCase()}.png`}
+                width={16} height={12}
+                alt={weather.country}
+                className="rounded-[2px] shrink-0 shadow-sm"
+              />
               {weather.city}, {weather.country}
             </p>
             <p className="text-6xl font-bold text-white tracking-tight">
@@ -59,8 +74,25 @@ export default function WeatherCard({ weather, travelFrom, travelTo, forecastCap
           <StatPill icon="🌬️" label={`${weather.wind_speed} m/s`}  title="Wind" />
           <StatPill icon="☁️" label={`${weather.cloudiness}%`}      title="Cloud cover" />
           <StatPill icon="👁️" label={`${weather.visibility_km} km`} title="Visibility" />
+          {weather.aqi != null && (
+            <AqiPill aqi={weather.aqi} label={weather.aqi_label ?? ""} />
+          )}
         </div>
       </div>
+
+      {/* ── Hourly forecast strip ── */}
+      {weather.hourly && weather.hourly.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+            Today&apos;s Hourly
+          </h3>
+          <ul className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory">
+            {weather.hourly.map((slot) => (
+              <HourlyCard key={slot.time} slot={slot} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* ── Detail metrics ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -77,14 +109,36 @@ export default function WeatherCard({ weather, travelFrom, travelTo, forecastCap
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
             {forecastLabel}
           </h3>
-          {isExtended && (
-            <span className="text-xs text-gray-400 flex items-center gap-1">
-              <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
-              Historical
-              <span className="inline-block w-2 h-2 rounded-full bg-sky-400 ml-1" />
-              Forecast
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isExtended && (
+              <span className="text-xs text-gray-400 flex items-center gap-1 mr-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+                Historical
+                <span className="inline-block w-2 h-2 rounded-full bg-sky-400 ml-1" />
+                Forecast
+              </span>
+            )}
+            {displayForecast.length > 2 && (
+              <>
+                <button type="button" onClick={() => scroll("left")} aria-label="Scroll left"
+                  className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100
+                             hover:bg-gray-200 text-gray-500 hover:text-gray-700
+                             transition-colors active:scale-95">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button type="button" onClick={() => scroll("right")} aria-label="Scroll right"
+                  className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100
+                             hover:bg-gray-200 text-gray-500 hover:text-gray-700
+                             transition-colors active:scale-95">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Capped date banner */}
@@ -99,7 +153,7 @@ export default function WeatherCard({ weather, travelFrom, travelTo, forecastCap
         )}
 
         {displayForecast.length > 0 ? (
-          <ul className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide">
+          <ul ref={scrollRef} className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide">
             {displayForecast.map((day, i) => (
               <ForecastCard
                 key={day.iso_date ?? `${day.date}-${day.condition}`}
@@ -145,6 +199,41 @@ function MetricCard({ icon, label, value }: { icon: string; label: string; value
       </p>
       <p className="text-sm font-bold text-gray-800 mt-1">{value}</p>
     </div>
+  );
+}
+
+function AqiPill({ aqi, label }: { aqi: number; label: string }) {
+  const dotColors: Record<number, string> = {
+    1: "bg-green-400",
+    2: "bg-yellow-400",
+    3: "bg-orange-400",
+    4: "bg-red-400",
+    5: "bg-purple-500",
+  };
+  return (
+    <div title="Air Quality Index"
+      className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm rounded-full
+                 px-3 py-1 text-xs font-medium text-white"
+    >
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColors[aqi] ?? "bg-gray-400"}`} />
+      AQI · {label}
+    </div>
+  );
+}
+
+function HourlyCard({ slot }: { slot: HourlySlot }) {
+  return (
+    <li className="flex-shrink-0 snap-start flex flex-col items-center gap-1
+                   bg-white border border-gray-100 rounded-xl px-3 py-2.5
+                   min-w-[76px] shadow-sm hover:shadow-md hover:-translate-y-0.5
+                   transition-all duration-200">
+      <p className="text-xs font-semibold text-gray-500">{slot.time}</p>
+      <WeatherAnimation condition={slot.condition} size={36} />
+      <p className="text-sm font-bold text-gray-800">{slot.temp}°C</p>
+      {slot.pop > 0 && (
+        <p className="text-[10px] text-sky-500 font-medium">💧 {slot.pop}%</p>
+      )}
+    </li>
   );
 }
 

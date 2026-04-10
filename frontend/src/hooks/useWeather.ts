@@ -100,6 +100,7 @@ export function useWeather() {
         const data: WeatherData = {
           ...weatherData,
           forecast: forecastData.forecast ?? [],
+          hourly: forecastData.hourly ?? [],
         };
 
         setWeather(data);
