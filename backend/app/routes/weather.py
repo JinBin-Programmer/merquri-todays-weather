@@ -7,7 +7,12 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.database import get_db
 from app.models.search_history import SearchHistoryDocument
-from app.services.weather_service import fetch_forecast, fetch_weather
+from app.services.weather_service import (
+    fetch_coords,
+    fetch_extended_forecast,
+    fetch_forecast,
+    fetch_weather,
+)
 
 router = APIRouter(prefix="/api", tags=["weather"])
 
@@ -33,10 +38,7 @@ async def get_weather(
 ):
     """
     Fetch current weather for a city/country pair.
-
     Pass save=false to skip saving to history (e.g. popular-city card clicks).
-    Returns 404 if the city/country combination is not recognised.
-    Returns 502 if the API key is invalid or not yet activated.
     """
     try:
         weather_data = await fetch_weather(city.strip(), country.strip())
@@ -104,14 +106,50 @@ async def delete_history(history_id: str, db: AsyncIOMotorDatabase = Depends(get
 async def get_forecast(
     city: str = Query(..., min_length=1, description="City name"),
     country: str = Query("", description="ISO 3166-1 alpha-2 country code (e.g. MY)"),
+    travel_from: str = Query("", description="Travel start date YYYY-MM-DD"),
+    travel_to: str = Query("", description="Travel end date YYYY-MM-DD"),
 ):
-    """Fetch a concise 5-day forecast for a city/country pair."""
+    """
+    Fetch weather forecast for a city/country pair.
+
+    - Without travel dates: returns OWM 5-day forecast.
+    - With both travel dates: returns extended historical+forecast data via
+      Open-Meteo (past dates from archive, future up to 16 days from forecast API).
+      Includes a `capped` flag when the end date exceeds the 16-day window.
+    """
+    city = city.strip()
+    country = country.strip()
+
+    # ── Extended mode (travel dates provided) ──────────────────────────────────
+    if travel_from and travel_to:
+        coords = await fetch_coords(city, country)
+        if coords is None:
+            raise HTTPException(status_code=404, detail="City not found")
+
+        lat, lon = coords
+        try:
+            days, capped = await fetch_extended_forecast(lat, lon, travel_from, travel_to)
+        except Exception:
+            raise HTTPException(
+                status_code=502,
+                detail="Extended forecast service unavailable. Try a shorter date range.",
+            )
+
+        return {
+            "city": city,
+            "country": country,
+            "forecast": days,
+            "extended": True,
+            "capped": capped,
+        }
+
+    # ── Standard mode (OWM 5-day forecast) ────────────────────────────────────
     try:
-        forecast_data = await fetch_forecast(city.strip(), country.strip())
+        forecast_data = await fetch_forecast(city, country)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
     if forecast_data is None:
         raise HTTPException(status_code=404, detail="City not found")
 
-    return forecast_data
+    return {**forecast_data, "extended": False, "capped": False}

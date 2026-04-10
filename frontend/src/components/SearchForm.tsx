@@ -1,11 +1,11 @@
 "use client";
 
-import { type FormEvent, useState, useEffect } from "react";
+import { type FormEvent, useState, useEffect, useRef } from "react";
 import { COUNTRIES, CITY_SUGGESTIONS } from "@/data/locations";
 
 interface SearchFormProps {
   city: string;
-  country: string;           // ISO code stored in parent (e.g. "MY")
+  country: string;
   travelFrom: string;
   travelTo: string;
   isLoading: boolean;
@@ -34,7 +34,6 @@ export default function SearchForm({
     () => !!(travelFrom || travelTo)
   );
 
-  // Show travel-date section if parent already has dates (e.g. after clear/restore)
   useEffect(() => {
     if (travelFrom || travelTo) setShowTravelDates(true);
   }, [travelFrom, travelTo]);
@@ -49,19 +48,17 @@ export default function SearchForm({
     onClear();
   };
 
-  // City suggestions based on the selected country code
   const citySuggestions = CITY_SUGGESTIONS[country] ?? [];
 
   return (
     <form onSubmit={handleSubmit} className="mb-5 space-y-3" aria-label="Weather search">
 
-      {/* ── Row 1: City + Country ── */}
+      {/* ── City + Country ── */}
       <div className="flex flex-wrap gap-3">
 
-        {/* City — free text with optional suggestions */}
+        {/* City */}
         <div className="flex-1 min-w-[140px]">
-          <label
-            htmlFor="city-input"
+          <label htmlFor="city-input"
             className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5"
           >
             City
@@ -72,53 +69,31 @@ export default function SearchForm({
             list="city-suggestions"
             value={city}
             onChange={(e) => onCityChange(e.target.value)}
-            placeholder="e.g. Johor Bahru"
+            placeholder="e.g. Singapore"
             autoComplete="off"
             className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
                        text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400
                        focus:border-transparent focus:bg-white transition-all placeholder:text-gray-300"
           />
-          {/* City suggestions — only appear when a country is selected */}
           {citySuggestions.length > 0 && (
             <datalist id="city-suggestions">
-              {citySuggestions.map((c) => (
-                <option key={c} value={c} />
-              ))}
+              {citySuggestions.map((c) => <option key={c} value={c} />)}
             </datalist>
           )}
         </div>
 
-        {/* Country — proper <select> dropdown, no autofill weirdness */}
-        <div className="w-48">
-          <label
-            htmlFor="country-select"
-            className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5"
-          >
+        {/* Country — custom dropdown */}
+        <div className="w-40">
+          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
             Country
           </label>
-          <select
-            id="country-select"
-            value={country}
-            onChange={(e) => onCountryChange(e.target.value)}
-            className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
-                       text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400
-                       focus:border-transparent focus:bg-white transition-all"
-          >
-            <option value="">— Any country —</option>
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <CountrySelect value={country} onChange={onCountryChange} />
         </div>
       </div>
 
-      {/* ── Row 2: Travel dates (collapsible) ── */}
+      {/* ── Travel dates ── */}
       <div>
-        <button
-          type="button"
-          onClick={() => setShowTravelDates((v) => !v)}
+        <button type="button" onClick={() => setShowTravelDates((v) => !v)}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-500
                      hover:text-sky-700 transition-colors"
         >
@@ -127,74 +102,66 @@ export default function SearchForm({
         </button>
 
         {showTravelDates && (
-          <div className="mt-2 flex flex-wrap gap-3">
-            <div className="flex-1 min-w-[140px]">
-              <label
-                htmlFor="travel-from"
-                className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5"
-              >
-                Travel From
-              </label>
-              <input
-                id="travel-from"
-                type="date"
-                value={travelFrom}
-                onChange={(e) => onTravelFromChange(e.target.value)}
-                className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
-                           text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400
-                           focus:border-transparent focus:bg-white transition-all"
-              />
+          <div className="mt-2 space-y-2">
+            <div className="flex flex-wrap gap-3">
+              <div className="flex-1 min-w-[140px]">
+                <label htmlFor="travel-from"
+                  className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5"
+                >
+                  Travel From
+                </label>
+                <input id="travel-from" type="date" value={travelFrom}
+                  onChange={(e) => onTravelFromChange(e.target.value)}
+                  className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
+                             text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400
+                             focus:border-transparent focus:bg-white transition-all"
+                />
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <label htmlFor="travel-to"
+                  className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5"
+                >
+                  Travel To
+                </label>
+                <input id="travel-to" type="date" value={travelTo}
+                  min={travelFrom || undefined}
+                  onChange={(e) => onTravelToChange(e.target.value)}
+                  className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
+                             text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400
+                             focus:border-transparent focus:bg-white transition-all"
+                />
+              </div>
             </div>
-            <div className="flex-1 min-w-[140px]">
-              <label
-                htmlFor="travel-to"
-                className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5"
-              >
-                Travel To
-              </label>
-              <input
-                id="travel-to"
-                type="date"
-                value={travelTo}
-                min={travelFrom || undefined}
-                onChange={(e) => onTravelToChange(e.target.value)}
-                className="w-full border border-gray-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm
-                           text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400
-                           focus:border-transparent focus:bg-white transition-all"
-              />
-            </div>
+            <p className="text-xs text-gray-400 flex items-center gap-1.5">
+              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Historical data for past dates · Forecast up to 16 days ahead
+            </p>
           </div>
         )}
       </div>
 
-      {/* ── Row 3: Action buttons ── */}
+      {/* ── Actions ── */}
       <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={isLoading || !city.trim()}
+        <button type="submit" disabled={isLoading || !city.trim()}
           className="inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-600 active:bg-sky-700
                      disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold
                      px-5 py-2.5 rounded-xl transition-colors shadow-sm shadow-sky-200/60"
         >
           {isLoading ? (
             <>
-              <span
-                className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"
-                aria-hidden="true"
-              />
+              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"
+                aria-hidden="true" />
               Searching…
             </>
           ) : (
-            <>
-              <SearchIcon />
-              Search
-            </>
+            <><SearchIcon /> Search</>
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={handleClear}
+        <button type="button" onClick={handleClear}
           className="text-sm font-medium text-gray-400 hover:text-gray-600 px-4 py-2.5
                      rounded-xl hover:bg-gray-100 transition-colors"
         >
@@ -202,6 +169,134 @@ export default function SearchForm({
         </button>
       </div>
     </form>
+  );
+}
+
+/* ── Custom country dropdown ─────────────────────────── */
+
+function CountrySelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Auto-focus search when dropdown opens
+  useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 50);
+  }, [open]);
+
+  const filtered = COUNTRIES.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.code.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSelect = (code: string) => {
+    onChange(code);
+    setOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      {/* Trigger — shows code when selected, placeholder when empty */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 border border-gray-200 bg-gray-50
+                   rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2
+                   focus:ring-sky-400 focus:bg-white transition-all"
+      >
+        {value ? (
+          <span className="font-bold text-gray-800 tracking-wide">{value}</span>
+        ) : (
+          <span className="text-gray-300">Country</span>
+        )}
+        <ChevronIcon open={open} />
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-gray-200
+                        rounded-xl shadow-2xl overflow-hidden min-w-[220px]">
+          {/* Search input */}
+          <div className="p-2 border-b border-gray-100">
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search country…"
+              className="w-full text-sm px-3 py-1.5 border border-gray-200 rounded-lg
+                         focus:outline-none focus:ring-2 focus:ring-sky-400"
+            />
+          </div>
+
+          {/* Option list */}
+          <ul className="max-h-52 overflow-y-auto py-1" role="listbox">
+            {/* Clear option */}
+            <li>
+              <button type="button" onClick={() => handleSelect("")}
+                className="w-full px-3 py-2 text-left text-sm text-gray-400 hover:bg-gray-50"
+              >
+                — Any country —
+              </button>
+            </li>
+
+            {filtered.length > 0 ? filtered.map((c) => (
+              <li key={c.code} role="option" aria-selected={value === c.code}>
+                <button
+                  type="button"
+                  onClick={() => handleSelect(c.code)}
+                  className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
+                             hover:bg-sky-50 transition-colors
+                             ${value === c.code ? "bg-sky-50 text-sky-700" : "text-gray-700"}`}
+                >
+                  <span>{c.name}</span>
+                  <span className={`text-xs font-mono font-bold
+                                   ${value === c.code ? "text-sky-500" : "text-gray-400"}`}>
+                    {c.code}
+                  </span>
+                </button>
+              </li>
+            )) : (
+              <li className="px-3 py-4 text-sm text-gray-400 text-center">No results</li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Icons ───────────────────────────────────────────── */
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
   );
 }
 

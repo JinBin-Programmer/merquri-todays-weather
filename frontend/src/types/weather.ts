@@ -1,12 +1,14 @@
-/** A single day in the 5-day forecast view */
+/** A single day in the forecast/history view */
 export interface ForecastDay {
-  date: string;
+  date: string;       // display string, e.g. "Mon, Apr 10"
+  iso_date: string;   // YYYY-MM-DD — used for travel-date filtering
   condition: string;
   description: string;
   temp_min: number;
   temp_max: number;
   humidity: number;
   wind_speed: number;
+  data_type?: "historical" | "forecast"; // set when using Open-Meteo extended range
 }
 
 /** Processed weather data returned by the backend after a successful search */

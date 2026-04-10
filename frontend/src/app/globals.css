@@ -2,11 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hide scrollbar while keeping scroll functionality */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+/* ── Scrollbar hide ───────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Weather animation keyframes ─────────────────────── */
+@keyframes weather-rotate {
+  to { transform: rotate(360deg); }
 }
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+@keyframes weather-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-9px); }
 }
+@keyframes weather-rain-drop {
+  0%   { transform: translateY(0px);  opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translateY(28px); opacity: 0; }
+}
+@keyframes weather-snow-fall {
+  0%   { transform: translateY(0px)  rotate(0deg);   opacity: 0; }
+  15%  { opacity: 0.9; }
+  100% { transform: translateY(28px) rotate(180deg); opacity: 0; }
+}
+@keyframes weather-lightning {
+  0%, 70%, 100% { opacity: 1; }
+  75%, 85%      { opacity: 0; }
+  80%           { opacity: 0.6; }
+}
+@keyframes weather-fog {
+  0%, 100% { transform: translateX(0px);  opacity: 0.55; }
+  50%       { transform: translateX(10px); opacity: 0.85; }
+}
+@keyframes weather-sun-glow {
+  0%, 100% { transform: scale(1);    opacity: 0.2; }
+  50%       { transform: scale(1.18); opacity: 0.38; }
+}
+
+/* ── Page background gentle breathe ──────────────────── */
+@keyframes bg-breathe {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+.bg-animated {
+  background: linear-gradient(135deg, #e0f2fe, #dbeafe, #ede9fe, #f0f9ff, #e0f2fe);
+  background-size: 300% 300%;
+  animation: bg-breathe 14s ease-in-out infinite;
+}
+
+/* ── Card / forecast entry animations ────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-weather-card {
+  animation: fade-in-up 0.45s ease-out both;
+}
+/* Staggered forecast card delays */
+.forecast-delay-0 { animation: fade-in-up 0.35s ease-out both 0.00s; }
+.forecast-delay-1 { animation: fade-in-up 0.35s ease-out both 0.08s; }
+.forecast-delay-2 { animation: fade-in-up 0.35s ease-out both 0.16s; }
+.forecast-delay-3 { animation: fade-in-up 0.35s ease-out both 0.24s; }
+.forecast-delay-4 { animation: fade-in-up 0.35s ease-out both 0.32s; }

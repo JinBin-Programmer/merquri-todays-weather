@@ -11,6 +11,7 @@ export function useWeather() {
   const [country, setCountry] = useState("");         // ISO code, e.g. "MY"
   const [travelFrom, setTravelFrom] = useState("");   // ISO date, e.g. "2024-05-10"
   const [travelTo, setTravelTo] = useState("");       // ISO date, e.g. "2024-05-15"
+  const [forecastCapped, setForecastCapped] = useState(false);
   // Tracks which popular city card is currently loading (format: "City-COUNTRY")
   const [loadingCity, setLoadingCity] = useState<string | null>(null);
 
@@ -34,8 +35,8 @@ export function useWeather() {
   /**
    * Search weather for the given city and country.
    *
-   * @param fromCard   true when triggered by a popular-city card (shows card spinner)
-   * @param saveToHistory  true only when the user explicitly clicked the Search button
+   * @param fromCard      true when triggered by a popular-city card (shows card spinner)
+   * @param saveToHistory true only when the user explicitly clicked the Search button
    */
   const search = useCallback(
     async (
@@ -47,20 +48,30 @@ export function useWeather() {
       if (!searchCity.trim()) return;
 
       setStatus("loading");
+      setForecastCapped(false);
       if (fromCard) setLoadingCity(`${searchCity}-${searchCountry}`);
 
       try {
-        const params = new URLSearchParams({
+        // Weather params (includes save flag + travel dates only when saving)
+        const weatherParams = new URLSearchParams({
           city: searchCity.trim(),
           country: searchCountry.trim(),
           save: saveToHistory ? "true" : "false",
           ...(saveToHistory && travelFrom ? { travel_from: travelFrom } : {}),
-          ...(saveToHistory && travelTo ? { travel_to: travelTo } : {}),
+          ...(saveToHistory && travelTo   ? { travel_to: travelTo }   : {}),
+        });
+
+        // Forecast params — travel dates always sent so extended range works
+        const forecastParams = new URLSearchParams({
+          city: searchCity.trim(),
+          country: searchCountry.trim(),
+          ...(travelFrom ? { travel_from: travelFrom } : {}),
+          ...(travelTo   ? { travel_to: travelTo }   : {}),
         });
 
         const [weatherRes, forecastRes] = await Promise.all([
-          fetch(`/api/weather?${params.toString()}`),
-          fetch(`/api/forecast?${params.toString()}`),
+          fetch(`/api/weather?${weatherParams.toString()}`),
+          fetch(`/api/forecast?${forecastParams.toString()}`),
         ]);
 
         if (weatherRes.status === 404 || forecastRes.status === 404) {
@@ -81,6 +92,10 @@ export function useWeather() {
 
         const weatherData = await weatherRes.json();
         const forecastData = await forecastRes.json();
+
+        if (forecastData.capped) {
+          setForecastCapped(true);
+        }
 
         const data: WeatherData = {
           ...weatherData,
@@ -124,6 +139,7 @@ export function useWeather() {
     setTravelTo("");
     setWeather(null);
     setStatus("idle");
+    setForecastCapped(false);
   }, []);
 
   return {
@@ -131,6 +147,7 @@ export function useWeather() {
     history,
     status,
     loadingCity,
+    forecastCapped,
     city,
     setCity,
     country,

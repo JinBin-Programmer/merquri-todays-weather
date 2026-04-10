@@ -1,16 +1,36 @@
 import type { ForecastDay, WeatherData } from "@/types/weather";
+import WeatherAnimation from "@/components/WeatherAnimation";
 
 interface WeatherCardProps {
   weather: WeatherData;
+  travelFrom?: string;
+  travelTo?: string;
+  forecastCapped?: boolean;
 }
 
-export default function WeatherCard({ weather }: WeatherCardProps) {
+export default function WeatherCard({ weather, travelFrom, travelTo, forecastCapped }: WeatherCardProps) {
   const style = getConditionStyle(weather.condition);
+  const hasTravelDates = !!(travelFrom || travelTo);
+
+  const displayForecast = hasTravelDates
+    ? weather.forecast.filter((day) => {
+        if (travelFrom && day.iso_date < travelFrom) return false;
+        if (travelTo   && day.iso_date > travelTo)   return false;
+        return true;
+      })
+    : weather.forecast;
+
+  const forecastLabel = hasTravelDates
+    ? `Trip Forecast${travelFrom ? ` · ${travelFrom}` : ""}${travelTo ? ` → ${travelTo}` : ""}`
+    : "5-Day Forecast";
+
+  // Detect if this is extended (Open-Meteo) data
+  const isExtended = displayForecast.some((d) => d.data_type !== undefined);
 
   return (
-    <section aria-label="Current weather result" className="mb-6 space-y-4">
+    <section aria-label="Current weather result" className="mb-6 space-y-4 animate-weather-card">
 
-      {/* ── Hero: condition gradient + OWM icon ── */}
+      {/* ── Hero ── */}
       <div className={`rounded-2xl bg-gradient-to-br ${style.gradient} p-5 shadow-lg`}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -28,48 +48,75 @@ export default function WeatherCard({ weather }: WeatherCardProps) {
             </p>
           </div>
 
-          {/* Weather icon from OpenWeatherMap CDN */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`https://openweathermap.org/img/wn/${getOWMIconCode(weather.condition)}@4x.png`}
-            alt={weather.condition}
-            width={110}
-            height={110}
-            className="shrink-0 drop-shadow-lg -mt-1"
-          />
+          <div className="shrink-0 -mt-1 drop-shadow-lg">
+            <WeatherAnimation condition={weather.condition} size={110} />
+          </div>
         </div>
 
         {/* Quick stat pills */}
         <div className="mt-4 flex flex-wrap gap-2">
-          <StatPill icon="💧" label={`${weather.humidity}%`} title="Humidity" />
-          <StatPill icon="🌬️" label={`${weather.wind_speed} m/s`} title="Wind" />
-          <StatPill icon="☁️" label={`${weather.cloudiness}%`} title="Cloud cover" />
+          <StatPill icon="💧" label={`${weather.humidity}%`}        title="Humidity" />
+          <StatPill icon="🌬️" label={`${weather.wind_speed} m/s`}  title="Wind" />
+          <StatPill icon="☁️" label={`${weather.cloudiness}%`}      title="Cloud cover" />
           <StatPill icon="👁️" label={`${weather.visibility_km} km`} title="Visibility" />
         </div>
       </div>
 
-      {/* ── Detail metrics grid ── */}
+      {/* ── Detail metrics ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        <MetricCard icon="🧭" label="Pressure" value={`${weather.pressure} hPa`} />
-        <MetricCard icon="🌡️" label="Temp Range" value={`${weather.temp_min}° – ${weather.temp_max}°C`} />
-        <MetricCard icon="🌅" label="Sunrise (UTC)" value={weather.sunrise} />
-        <MetricCard icon="🌇" label="Sunset (UTC)" value={weather.sunset} />
-        <MetricCard icon="🕒" label="Observed At" value={weather.time} />
+        <MetricCard icon="🧭" label="Pressure"      value={`${weather.pressure} hPa`} />
+        <MetricCard icon="🌡️" label="Temp Range"   value={`${weather.temp_min}° – ${weather.temp_max}°C`} />
+        <MetricCard icon="🌅" label="Sunrise (SGT)" value={weather.sunrise} />
+        <MetricCard icon="🌇" label="Sunset (SGT)"  value={weather.sunset} />
+        <MetricCard icon="🕒" label="Observed At"   value={weather.time} />
       </div>
 
-      {/* ── 5-Day Forecast ── */}
-      {weather.forecast.length > 0 && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            5-Day Forecast
+      {/* ── Forecast / History ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+            {forecastLabel}
           </h3>
+          {isExtended && (
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+              Historical
+              <span className="inline-block w-2 h-2 rounded-full bg-sky-400 ml-1" />
+              Forecast
+            </span>
+          )}
+        </div>
+
+        {/* Capped date banner */}
+        {forecastCapped && travelTo && (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 mb-3 text-xs text-amber-700">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Forecast is limited to 16 days ahead. Showing data up to the available range — dates beyond that cannot be predicted yet.
+          </div>
+        )}
+
+        {displayForecast.length > 0 ? (
           <ul className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide">
-            {weather.forecast.map((day) => (
-              <ForecastCard key={`${day.date}-${day.condition}`} day={day} />
+            {displayForecast.map((day, i) => (
+              <ForecastCard
+                key={day.iso_date ?? `${day.date}-${day.condition}`}
+                day={day}
+                delayClass={`forecast-delay-${Math.min(i, 4)}`}
+              />
             ))}
           </ul>
-        </div>
-      )}
+        ) : hasTravelDates ? (
+          <div className="rounded-xl border border-dashed border-sky-200 bg-sky-50 px-4 py-5 text-center">
+            <p className="text-sm font-medium text-sky-700">No data for the selected travel dates</p>
+            <p className="text-xs text-sky-500 mt-1">
+              Historical data is available for past dates · Forecast covers up to 16 days ahead
+            </p>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -78,8 +125,7 @@ export default function WeatherCard({ weather }: WeatherCardProps) {
 
 function StatPill({ icon, label, title }: { icon: string; label: string; title: string }) {
   return (
-    <div
-      title={title}
+    <div title={title}
       className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm rounded-full
                  px-3 py-1 text-xs font-medium text-white"
     >
@@ -91,7 +137,8 @@ function StatPill({ icon, label, title }: { icon: string; label: string; title: 
 
 function MetricCard({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-xl px-3.5 py-3 shadow-sm">
+    <div className="bg-white border border-gray-100 rounded-xl px-3.5 py-3 shadow-sm
+                    hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
         <span className="mr-1" aria-hidden="true">{icon}</span>
         {label}
@@ -101,34 +148,43 @@ function MetricCard({ icon, label, value }: { icon: string; label: string; value
   );
 }
 
-function ForecastCard({ day }: { day: ForecastDay }) {
+function ForecastCard({ day, delayClass }: { day: ForecastDay; delayClass: string }) {
   const style = getConditionStyle(day.condition);
+  const isHistorical = day.data_type === "historical";
+  const isForecast = day.data_type === "forecast";
 
   return (
-    <li className="min-w-[138px] snap-start rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-white flex-shrink-0">
-      {/* Gradient header with weather icon */}
+    <li className={`min-w-[138px] snap-start rounded-2xl overflow-hidden shadow-sm
+                    border border-gray-100 bg-white flex-shrink-0
+                    hover:shadow-md hover:-translate-y-1 transition-all duration-200
+                    ${delayClass}`}>
+      {/* Gradient header */}
       <div className={`bg-gradient-to-br ${style.gradient} flex flex-col items-center pt-3 pb-2 px-2`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`https://openweathermap.org/img/wn/${getOWMIconCode(day.condition)}@2x.png`}
-          alt={day.condition}
-          width={60}
-          height={60}
-          className="drop-shadow"
-          loading="lazy"
-        />
+        <WeatherAnimation condition={day.condition} size={60} />
         <p className="text-white text-xs font-semibold mt-0.5">{day.date}</p>
       </div>
 
       {/* Details */}
       <div className="px-3 py-2.5">
+        {/* Historical / Forecast badge */}
+        {isHistorical && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold
+                           bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 mb-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+            Historical
+          </span>
+        )}
+        {isForecast && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold
+                           bg-sky-100 text-sky-700 rounded-full px-2 py-0.5 mb-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />
+            Forecast
+          </span>
+        )}
+
         <p className="text-xs text-gray-500 capitalize truncate">{day.description}</p>
-        <p className="text-sm font-bold text-gray-800 mt-1">
-          {day.temp_min}° – {day.temp_max}°C
-        </p>
-        <p className="text-xs text-gray-400 mt-1.5">
-          💧 {day.humidity}%&nbsp;&nbsp;🌬️ {day.wind_speed} m/s
-        </p>
+        <p className="text-sm font-bold text-gray-800 mt-1">{day.temp_min}° – {day.temp_max}°C</p>
+        <p className="text-xs text-gray-400 mt-1.5">💧 {day.humidity}%&nbsp;&nbsp;🌬️ {day.wind_speed} m/s</p>
       </div>
     </li>
   );
@@ -136,28 +192,10 @@ function ForecastCard({ day }: { day: ForecastDay }) {
 
 /* ── Helpers ─────────────────────────────────────────── */
 
-/** Maps a condition string to the closest OWM icon code */
-function getOWMIconCode(condition: string): string {
-  const key = condition.toLowerCase();
-  if (key.includes("thunder")) return "11d";
-  if (key.includes("drizzle")) return "09d";
-  if (key.includes("rain")) return "10d";
-  if (key.includes("snow")) return "13d";
-  if (key.includes("mist") || key.includes("fog") || key.includes("haze") || key.includes("smoke")) return "50d";
-  if (key.includes("cloud")) return "04d";
-  if (key.includes("clear")) return "01d";
-  return "02d";
-}
+interface ConditionStyle { gradient: string; label: string; }
 
-interface ConditionStyle {
-  gradient: string;
-  label: string; // text colour for city label on gradient bg
-}
-
-/** Condition-aware gradient + label colour for hero and forecast cards */
 function getConditionStyle(condition: string): ConditionStyle {
   const key = condition.toLowerCase();
-
   if (key.includes("thunder"))
     return { gradient: "from-slate-800 via-purple-900 to-slate-700", label: "text-purple-300" };
   if (key.includes("rain"))
@@ -172,6 +210,5 @@ function getConditionStyle(condition: string): ConditionStyle {
     return { gradient: "from-slate-500 via-gray-400 to-blue-500",    label: "text-gray-200"   };
   if (key.includes("clear"))
     return { gradient: "from-sky-400 via-blue-500 to-cyan-400",      label: "text-sky-100"    };
-
   return   { gradient: "from-blue-500 via-sky-500 to-cyan-400",      label: "text-sky-100"    };
 }

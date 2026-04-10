@@ -6,6 +6,27 @@ import WeatherCard from "@/components/WeatherCard";
 import SearchHistory from "@/components/SearchHistory";
 import PopularCities from "@/components/PopularCities";
 
+/** Map OWM condition string → full-width Unsplash background image URL */
+function getWeatherBg(condition: string): string {
+  const key = condition.toLowerCase();
+  const q = "w=1920&h=1080&fit=crop&q=80";
+  if (key.includes("thunder"))
+    return `https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?${q}`;
+  if (key.includes("drizzle"))
+    return `https://images.unsplash.com/photo-1428592953211-077101b2021b?${q}`;
+  if (key.includes("rain"))
+    return `https://images.unsplash.com/photo-5Q5jtb1SEVo?${q}`;
+  if (key.includes("snow"))
+    return `https://images.unsplash.com/photo-1491002052546-bf38f186af56?${q}`;
+  if (key.includes("mist") || key.includes("fog") || key.includes("haze"))
+    return `https://images.unsplash.com/photo-1485236715568-ddc5ee6ca227?${q}`;
+  if (key.includes("cloud"))
+    return `https://images.unsplash.com/photo-1534088568595-a066f410bcda?${q}`;
+  if (key.includes("clear"))
+    return `https://images.unsplash.com/photo-1597200381847-30ec200eeb9a?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D`;
+  return `https://images.unsplash.com/photo-1469474968028-56623f02e42e?${q}`;
+}
+
 export default function HomePage() {
   const {
     weather,
@@ -23,29 +44,50 @@ export default function HomePage() {
     search,
     deleteHistory,
     clear,
+    forecastCapped,
   } = useWeather();
 
-  /** Re-search from a history record — does NOT create a new history entry */
+  const bgImage = weather ? getWeatherBg(weather.condition) : null;
+
   const handleReSearch = (searchCity: string, searchCountry: string) => {
     setCity(searchCity);
     setCountry(searchCountry);
     search(searchCity, searchCountry, false, false);
   };
 
-  /** Popular city card click — does NOT create a history entry */
   const handleCityCardClick = (searchCity: string, searchCountry: string) => {
     setCity(searchCity);
     setCountry(searchCountry);
     search(searchCity, searchCountry, true, false);
   };
 
-  /** Form Search button — the ONLY path that saves to history */
   const handleFormSearch = (searchCity: string, searchCountry: string) => {
     search(searchCity, searchCountry, false, true);
   };
 
   return (
-    <main className="min-h-screen flex items-start justify-center p-4 sm:p-8 pt-8">
+    <main className="min-h-screen flex items-start justify-center p-4 sm:p-8 pt-8 relative">
+
+      {/* ── Full-screen weather background ── */}
+      <div className="fixed inset-0 -z-10">
+        {bgImage ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={bgImage}
+              src={bgImage}
+              alt=""
+              className="w-full h-full object-cover transition-opacity duration-1000"
+            />
+            {/* Gray overlay so all text stays readable */}
+            <div className="absolute inset-0 bg-gray-900/50" />
+          </>
+        ) : (
+          /* Default animated gradient when no weather loaded */
+          <div className="w-full h-full bg-animated" />
+        )}
+      </div>
+
       <div className="w-full max-w-2xl space-y-4">
 
         {/* Popular cities */}
@@ -84,8 +126,28 @@ export default function HomePage() {
             onClear={clear}
           />
 
+          {/* Idle prompt */}
+          {status === "idle" && (
+            <div className="flex flex-col items-center py-8 text-center select-none">
+              <svg viewBox="0 0 96 96" width="72" height="72" aria-hidden="true" className="mb-3 opacity-30">
+                <circle cx="48" cy="48" r="32" fill="none" stroke="#0ea5e9" strokeWidth="4" strokeDasharray="8 4" />
+                <circle cx="48" cy="48" r="16" fill="#0ea5e9" opacity="0.3" />
+                <circle cx="48" cy="48" r="6"  fill="#0ea5e9" opacity="0.6" />
+              </svg>
+              <p className="text-sm font-medium text-gray-400">Enter a city to see today&apos;s weather</p>
+              <p className="text-xs text-gray-300 mt-1">Or pick a popular city above</p>
+            </div>
+          )}
+
           {/* Results */}
-          {status === "success" && weather && <WeatherCard weather={weather} />}
+          {status === "success" && weather && (
+            <WeatherCard
+              weather={weather}
+              travelFrom={travelFrom}
+              travelTo={travelTo}
+              forecastCapped={forecastCapped}
+            />
+          )}
 
           {status === "not_found" && (
             <div role="alert"
