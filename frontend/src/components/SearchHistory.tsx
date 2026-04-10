@@ -203,8 +203,8 @@ function HistoryRow({
         </div>
       </div>
 
-      {/* Actions — revealed on hover */}
-      <div className="flex items-center gap-0.5 shrink-0 ml-3 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions */}
+      <div className="flex items-center gap-0.5 shrink-0 ml-3 opacity-25 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onReSearch(record.city, record.country)}
           aria-label={`Re-search ${record.city}, ${record.country}`}

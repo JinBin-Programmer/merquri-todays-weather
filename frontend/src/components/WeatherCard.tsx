@@ -97,9 +97,9 @@ export default function WeatherCard({ weather, travelFrom, travelTo, forecastCap
       {/* ── Detail metrics ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         <MetricCard icon="🧭" label="Pressure"      value={`${weather.pressure} hPa`} />
-        <MetricCard icon="🌡️" label="Temp Range"   value={`${weather.temp_min}° – ${weather.temp_max}°C`} />
-        <MetricCard icon="🌅" label="Sunrise (SGT)" value={weather.sunrise} />
-        <MetricCard icon="🌇" label="Sunset (SGT)"  value={weather.sunset} />
+        <MetricCard icon="🌡️" label="Temp Range"   value={`${weather.temp_min}° – ${weather.temp_max}°C`} variant="sky" />
+        <MetricCard icon="🌅" label="Sunrise (SGT)" value={weather.sunrise} variant="amber" />
+        <MetricCard icon="🌇" label="Sunset (SGT)"  value={weather.sunset} variant="orange" />
         <MetricCard icon="🕒" label="Observed At"   value={weather.time} />
       </div>
 
@@ -189,10 +189,19 @@ function StatPill({ icon, label, title }: { icon: string; label: string; title: 
   );
 }
 
-function MetricCard({ icon, label, value }: { icon: string; label: string; value: string }) {
+function MetricCard({ icon, label, value, variant = "default" }: {
+  icon: string; label: string; value: string;
+  variant?: "default" | "sky" | "amber" | "orange";
+}) {
+  const bgClass = {
+    default: "bg-white",
+    sky:     "bg-gradient-to-br from-sky-50 to-white",
+    amber:   "bg-gradient-to-br from-amber-50 to-white",
+    orange:  "bg-gradient-to-br from-orange-50 to-white",
+  }[variant];
   return (
-    <div className="bg-white border border-gray-100 rounded-xl px-3.5 py-3 shadow-sm
-                    hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+    <div className={`${bgClass} border border-gray-100 rounded-xl px-3.5 py-3 shadow-sm
+                    hover:shadow-md hover:-translate-y-0.5 transition-all duration-200`}>
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
         <span className="mr-1" aria-hidden="true">{icon}</span>
         {label}

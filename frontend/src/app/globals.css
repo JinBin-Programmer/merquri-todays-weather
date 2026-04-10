@@ -6,6 +6,15 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ── Background image fade-in ─────────────────────────── */
+@keyframes bg-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-bg-fade {
+  animation: bg-fade-in 1.4s ease-in-out forwards;
+}
+
 /* ── Weather animation keyframes ─────────────────────── */
 @keyframes weather-rotate {
   to { transform: rotate(360deg); }

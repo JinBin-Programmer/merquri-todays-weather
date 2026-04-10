@@ -146,9 +146,10 @@ export default function SearchForm({
       {/* ── Actions ── */}
       <div className="flex items-center gap-2">
         <button type="submit" disabled={isLoading || !city.trim()}
-          className="inline-flex items-center gap-2 bg-sky-500 hover:bg-sky-600 active:bg-sky-700
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600
+                     hover:from-sky-600 hover:to-blue-700 active:from-sky-700 active:to-blue-800
                      disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold
-                     px-5 py-2.5 rounded-xl transition-colors shadow-sm shadow-sky-200/60"
+                     px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-sky-300/50"
         >
           {isLoading ? (
             <>
