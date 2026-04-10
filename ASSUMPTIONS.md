@@ -49,13 +49,14 @@
 
 ## Time Zone
 
-- The **Time** field shown in the weather card is the UTC timestamp provided by OpenWeatherMap (`dt` field), formatted as `YYYY-MM-DD HH:MM AM/PM`.
-  It represents the time of the data measurement, not the user's local time.
+- All timestamps in the weather card and search history are displayed in **Singapore Time (SGT, UTC+8)**.
+  The backend converts the UTC `dt` value from OpenWeatherMap to SGT before sending it to the frontend, formatted as `YYYY-MM-DD HH:MM AM/PM`.
 
 ## Database
 
-- **SQLite** is used for data persistence. It requires no additional infrastructure and is sufficient for the scale of this application.
-- The database file is stored at `/app/data/weather.db` inside the backend container and is mounted to a named Docker volume (`db_data`) so data survives container restarts.
+- **MongoDB Atlas** is used for data persistence. It is a fully managed cloud database that requires no self-hosted infrastructure, scales easily, and integrates naturally with Python via the async Motor driver.
+- Search history documents are stored in the `search_history` collection, indexed on `searched_at` for efficient newest-first sorting.
+- For local development the `MONGODB_URL` in `.env` can point to a local MongoDB instance or an Atlas free-tier cluster.
 
 ## Tech Stack Choices
 
@@ -63,7 +64,7 @@
 |---|---|---|
 | Frontend framework | Next.js 15 (App Router) | Satisfies the React requirement; built-in server-side proxy route handlers simplify backend communication |
 | Backend framework | FastAPI | Async-native, excellent DX, auto-generates OpenAPI docs at `/docs` |
-| Database ORM | SQLAlchemy 2.x | Industry-standard; straightforward migration path to PostgreSQL/MySQL if needed |
+| Database | MongoDB Atlas + Motor | Managed cloud database; Motor provides async I/O that fits naturally with FastAPI's async model |
 | Styling | Tailwind CSS | Rapid, utility-first styling; responsive by default |
 | API proxy | Next.js route handler (`/api/[...slug]`) | Reads `BACKEND_URL` at runtime, making Docker networking work without rebuilding the image |
 
