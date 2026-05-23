@@ -5,6 +5,7 @@ import SearchForm from "@/components/SearchForm";
 import WeatherCard from "@/components/WeatherCard";
 import SearchHistory from "@/components/SearchHistory";
 import PopularCities from "@/components/PopularCities";
+import AdBanner from "@/components/AdBanner";
 
 /** Default background shown before any search */
 const DEFAULT_BG = `https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&h=1080&fit=crop&q=80`;
@@ -18,7 +19,7 @@ function getWeatherBg(condition: string): string {
   if (key.includes("drizzle"))
     return `https://images.unsplash.com/photo-1428592953211-077101b2021b?${q}`;
   if (key.includes("rain"))
-    return `https://images.unsplash.com/photo-5Q5jtb1SEVo?${q}`;
+    return `https://images.unsplash.com/photo-1519692933481-e162a57d6721?${q}`;
   if (key.includes("snow"))
     return `https://images.unsplash.com/photo-1491002052546-bf38f186af56?${q}`;
   if (key.includes("mist") || key.includes("fog") || key.includes("haze"))
@@ -100,6 +101,9 @@ export default function HomePage() {
           loadingCity={loadingCity}
         />
 
+        {/* Ad banner – leaderboard between popular cities and search card */}
+        <AdBanner slot="1234567890" format="horizontal" className="min-h-[90px] rounded-xl overflow-hidden" />
+
         {/* Main card */}
         <div className="bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl shadow-xl p-6">
 
@@ -169,12 +173,16 @@ export default function HomePage() {
 
           {/* Results */}
           {status === "success" && weather && (
-            <WeatherCard
-              weather={weather}
-              travelFrom={travelFrom}
-              travelTo={travelTo}
-              forecastCapped={forecastCapped}
-            />
+            <>
+              <WeatherCard
+                weather={weather}
+                travelFrom={travelFrom}
+                travelTo={travelTo}
+                forecastCapped={forecastCapped}
+              />
+              {/* Ad banner – rectangle after weather results */}
+              <AdBanner slot="0987654321" format="rectangle" className="min-h-[250px] rounded-xl overflow-hidden mb-4" />
+            </>
           )}
 
           {status === "not_found" && (
